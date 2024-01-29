@@ -1,0 +1,460 @@
+```{r}
+library(readxl)
+Sleep_vs_Nutrition_ML_project <- read_excel("C:/Users/12703/OneDrive - University of Kentucky/Sleep vs Nutrition ML project.xlsx")
+View(Sleep_vs_Nutrition_ML_project)
+```
+
+
+```{r}
+total_data <- Sleep_vs_Nutrition_ML_project
+total_data_clean <- na.omit(total_data)
+summary(total_data_clean)
+
+```
+```{r}
+library(dplyr)
+
+total_data_clean <- total_data_clean %>% 
+                    filter(`Sleep Per Week/Work Day` <= 24)
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+
+vitamin_mineral_columns <- c('A', 'B1', 'B2', 'B6', 'B12', 'C', 'Choline', 'D', 'Calcium', 'Copper', 'Iron', 'Magnesium', 'Phosphorus', 'Potassium', 'Selenium', 'Sodium', 'Zinc')
+
+total_data_clean$average_nutrient_intake <- rowMeans(total_data_clean[, vitamin_mineral_columns], na.rm = TRUE)
+
+ggplot(total_data_clean, aes(x = `Sleep Per Week/Work Day`, y = average_nutrient_intake)) +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Relationship between Sleep Hours and Average Nutrient Intake per Participant",
+       x = "Sleep Hours per Week/Work Day",
+       y = "Average Nutrient Intake per Participant")
+
+
+
+
+```
+
+
+`
+```{r}
+library(dplyr)
+total_data_clean <- total_data_clean %>% 
+                    filter(`Trouble Sleeping` == 1 | `Trouble Sleeping` == 2)
+```
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Assuming total_data_clean is your original data frame with all participants.
+
+# Filter the data for only those with Trouble Sleeping = 1 or 2
+filtered_data <- total_data_clean %>% 
+  filter(`Trouble Sleeping` %in% c(1, 2))
+
+# Now randomly sample 100 participants from each group
+set.seed(123) # Setting a seed for reproducibility
+sampled_data <- filtered_data %>%
+  group_by(`Trouble Sleeping`) %>%
+  sample_n(size = 200) %>%
+  ungroup()
+
+# Recalculate the total nutrient intake if it's not already in the sampled_data
+sampled_data$total_nutrient_intake <- rowSums(sampled_data[, vitamin_mineral_columns], na.rm = TRUE)
+
+# Create the bar chart using the sampled data
+ggplot(sampled_data, aes(x = as.factor(`Trouble Sleeping`), y = total_nutrient_intake, fill = as.factor(`Trouble Sleeping`))) +
+  geom_bar(stat = "summary", fun = "mean") +
+  theme_minimal() +
+  labs(title = "Mean Total Nutrient Intake vs Trouble Sleeping (Sampled)",
+       x = "Trouble Sleeping (1 = Yes, 2 = No)",
+       y = "Mean Total Nutrient Intake") +
+  scale_fill_discrete(name = "Trouble Sleeping")
+
+```
+
+
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+vitamin_mineral_columns <- c('A', 'B1', 'B2', 'B6', 'B12', 'C', 'Choline', 'D', 'Calcium', 'Copper', 'Iron', 'Magnesium', 'Phosphorus', 'Potassium', 'Selenium', 'Sodium', 'Zinc')
+
+# Assuming total_data_clean is your original data frame with all participants.
+
+# Calculate the total nutrient intake
+total_data_clean$total_nutrient_intake <- rowSums(total_data_clean[, vitamin_mineral_columns], na.rm = TRUE)
+
+# Filter and sample the data
+set.seed(123) # Setting a seed for reproducibility
+sampled_data <- total_data_clean %>%
+  filter(`Sleep Disorder` %in% c(1, 2)) %>%
+  group_by(`Sleep Disorder`) %>%
+  sample_n(size = 200) %>%
+  ungroup()
+
+# Create the bar chart using the sampled data
+ggplot(sampled_data, aes(x = as.factor(`Sleep Disorder`), y = total_nutrient_intake)) +
+  geom_bar(stat = "summary", fun = "mean", aes(fill = as.factor(`Sleep Disorder`))) +
+  theme_minimal() +
+  labs(title = "Mean Total Nutrient Intake vs Sleep Disorder Diagnosis (Sampled)",
+       x = "Sleep Disorder (1 = Diagnosed, 2 = Not Diagnosed)",
+       y = "Mean Total Nutrient Intake") +
+  scale_fill_discrete(name = "Sleep Disorder Diagnosis")
+
+
+
+```
+
+```{r}
+#random Forest, sleep disorder is response variable
+library(randomForest)
+library(caret)
+
+total_data_clean$`Sleep Disorder` <- as.factor(total_data_clean$`Sleep Disorder`)
+
+model_data <- total_data_clean[, c('total_nutrient_intake', 'average_nutrient_intake', 'Sleep Disorder')]
+
+set.seed(123) 
+index <- createDataPartition(model_data$`Sleep Disorder`, p = 0.8, list = FALSE)
+train_data <- model_data[index, ]
+test_data <- model_data[-index, ]
+
+
+rf_model <- randomForest(`Sleep Disorder` ~ total_nutrient_intake + average_nutrient_intake, data = train_data, ntree = 500)
+
+
+print(rf_model)
+
+
+predictions <- predict(rf_model, newdata = test_data)
+
+
+confusion_matrix <- confusionMatrix(predictions, test_data$`Sleep Disorder`)
+print(confusion_matrix)
+
+
+```
+```{r}
+library(randomForest)
+library(caret)
+
+total_data_clean$`Trouble Sleeping` <- as.factor(total_data_clean$`Trouble Sleeping`)
+
+
+model_data_ts <- total_data_clean[, c('total_nutrient_intake', 'average_nutrient_intake', 'Trouble Sleeping')]
+
+
+set.seed(123) 
+index_ts <- createDataPartition(model_data_ts$`Trouble Sleeping`, p = 0.8, list = FALSE)
+train_data_ts <- model_data_ts[index_ts, ]
+test_data_ts <- model_data_ts[-index_ts, ]
+
+
+rf_model_ts <- randomForest(`Trouble Sleeping` ~ total_nutrient_intake + average_nutrient_intake, data = train_data_ts, ntree = 500)
+
+
+print(rf_model_ts)
+
+
+predictions_ts <- predict(rf_model_ts, newdata = test_data_ts)
+
+
+confusion_matrix_ts <- confusionMatrix(predictions_ts, test_data_ts$`Trouble Sleeping`)
+print(confusion_matrix_ts)
+
+```
+```{r}
+
+data_with_sleep_problems <- subset(total_data_clean, `Trouble Sleeping` == 1)
+
+data_without_sleep_problems <- subset(total_data_clean, `Trouble Sleeping` == 2)
+
+
+data_with_sleep_disorder <- subset(total_data_clean, `Sleep Disorder` == 1)
+
+
+data_without_sleep_disorders <- subset(total_data_clean, `Sleep Disorder` == 2)
+
+```
+
+```{r}
+Vit_A <- t.test(data_with_sleep_problems$A, data_without_sleep_problems$A)
+print(Vit_A)
+
+
+Vit_B1 <- t.test(data_with_sleep_problems$B1, data_without_sleep_problems$B1)
+print(Vit_B1)
+
+Vit_B2 <- t.test(data_with_sleep_problems$B2, data_without_sleep_problems$B2)
+print(Vit_B2)
+
+
+Vit_B6 <- t.test(data_with_sleep_problems$B6, data_without_sleep_problems$B6)
+print(Vit_B6)
+
+
+Vit_B12 <- t.test(data_with_sleep_problems$B12, data_without_sleep_problems$B12)
+print(Vit_B12)
+
+
+
+vit_c <- t.test(data_with_sleep_problems$C, data_without_sleep_problems$C)
+print(vit_c)
+
+
+Choline <- t.test(data_with_sleep_problems$Choline, data_without_sleep_problems$Choline)
+print(Choline)
+
+
+Calcium <- t.test(data_with_sleep_problems$Calcium, data_without_sleep_problems$Calcium)
+print(Calcium)
+
+
+
+Vitamin_d <- t.test(data_with_sleep_problems$D, data_without_sleep_problems$D)
+print(Vitamin_d)
+
+
+vit_e <- t.test(data_with_sleep_problems$E, data_without_sleep_problems$E)
+print(vit_e)
+
+
+
+vit_k <- t.test(data_with_sleep_problems$K, data_without_sleep_problems$K)
+print(vit_k)
+
+
+
+copper <- t.test(data_with_sleep_problems$Copper, data_without_sleep_problems$Copper)
+print(copper)
+
+iron <- t.test(data_with_sleep_problems$Iron, data_without_sleep_problems$Iron)
+print(iron)
+
+
+
+Magnesium <- t.test(data_with_sleep_problems$Magnesium, data_without_sleep_problems$Magnesium)
+print(Magnesium)
+
+
+
+
+Phos <- t.test(data_with_sleep_problems$Phosphorus, data_without_sleep_problems$Phosphorus)
+print(Phos)
+
+
+potassium <- t.test(data_with_sleep_problems$Potassium, data_without_sleep_problems$Potassium)
+print(potassium)
+
+
+
+sel <- t.test(data_with_sleep_problems$Selenium, data_without_sleep_problems$Selenium)
+print(sel)
+
+
+sodium <- t.test(data_with_sleep_problems$Sodium, data_without_sleep_problems$Sodium)
+print(sodium)
+
+zinc <- t.test(data_with_sleep_problems$Zinc, data_without_sleep_problems$Zinc)
+print(zinc)
+
+
+sleep <- t.test(data_with_sleep_problems$'Sleep Per Week/Work Day', data_without_sleep_problems$'Sleep Per Week/Work Day')
+print(sleep)
+```
+
+```{r}
+
+A <- t.test(data_with_sleep_disorder$A, data_without_sleep_disorders$A)
+print(A)
+
+
+B1 <- t.test(data_with_sleep_disorder$B1, data_without_sleep_disorders$B1)
+print(B1)
+
+
+B2 <- t.test(data_with_sleep_disorder$B2, data_without_sleep_disorders$B2)
+print(B2)
+
+
+B6 <- t.test(data_with_sleep_disorder$B6, data_without_sleep_disorders$B6)
+print(B6)
+
+
+B12 <- t.test(data_with_sleep_disorder$B12, data_without_sleep_disorders$B12)
+print(B12)
+
+
+c <- t.test(data_with_sleep_disorder$C, data_without_sleep_disorders$C)
+print(c)
+
+
+Cho <- t.test(data_with_sleep_disorder$Choline, data_without_sleep_disorders$Choline)
+print(Cho)
+
+
+Cal <- t.test(data_with_sleep_disorder$Calcium, data_without_sleep_disorders$Calcium)
+print(Cal)
+
+
+d <- t.test(data_with_sleep_disorder$D, data_without_sleep_disorders$D)
+print(d)
+
+
+e <- t.test(data_with_sleep_disorder$E, data_without_sleep_disorders$E)
+print(e)
+
+
+k <- t.test(data_with_sleep_disorder$K, data_without_sleep_disorders$K)
+print(k)
+
+copp <- t.test(data_with_sleep_disorder$Copper, data_without_sleep_disorders$Copper)
+print(copp)
+
+
+iron_dis <- t.test(data_with_sleep_disorder$Iron, data_without_sleep_disorders$Iron)
+print(iron_dis)
+
+Magn <- t.test(data_with_sleep_disorder$Magnesium, data_without_sleep_disorders$Magnesium)
+print(Magn)
+
+
+Phosph <- t.test(data_with_sleep_disorder$Phosphorus, data_without_sleep_disorders$Phosphorus)
+print(Phosph)
+
+
+p <- t.test(data_with_sleep_disorder$Potassium, data_without_sleep_disorders$Potassium)
+print(p)
+
+
+sele <- t.test(data_with_sleep_disorder$Selenium, data_without_sleep_disorders$Selenium)
+print(sele)
+
+
+sod <- t.test(data_with_sleep_disorder$Sodium, data_without_sleep_disorders$Sodium)
+print(sod)
+
+
+zi <- t.test(data_with_sleep_disorder$Zinc, data_without_sleep_disorders$Zinc)
+print(zi)
+
+sleep_hours <- t.test(data_with_sleep_disorder$'Sleep Per Week/Work Day', data_without_sleep_disorders$'Sleep Per Week/Work Day')
+print(sleep)
+
+```
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Adding a new column for the sum of the five specific nutrients
+total_data_clean$combined_nutrients <- rowSums(total_data_clean[, c('A', 'C', 'Choline', 'Calcium', 'E')], na.rm = TRUE)
+
+# Set a seed for reproducibility
+set.seed(123)
+
+# Sample 300 observations for 'Sleep Disorder'
+sleep_disorder_sampled <- total_data_clean %>%
+  filter(`Sleep Disorder` %in% c(1, 2)) %>%
+  sample_n(size = 600) %>%
+  filter(`Sleep Disorder` == 1 | `Sleep Disorder` == 2)
+
+# Scatter plot for people with and without a sleeping disorder
+ggplot(sleep_disorder_sampled, aes(x = total_nutrient_intake, y = combined_nutrients)) +
+  geom_point(aes(color = as.factor(`Sleep Disorder`))) +
+  labs(title = "Total Nutrient Intake vs Combined Nutrients (Sleep Disorder) Sampled",
+       x = "Total Nutrient Intake",
+       y = "Combined Nutrients (Vitamin A, C, Choline, Calcium, E)",
+       color = "Sleep Disorder")
+
+# Sample 300 observations for 'Trouble Sleeping'
+trouble_sleeping_sampled <- total_data_clean %>%
+  filter(`Trouble Sleeping` %in% c(1, 2)) %>%
+  sample_n(size = 600) %>%
+  filter(`Trouble Sleeping` == 1 | `Trouble Sleeping` == 2)
+
+# Scatter plot for people with and without trouble sleeping
+ggplot(trouble_sleeping_sampled, aes(x = total_nutrient_intake, y = combined_nutrients)) +
+  geom_point(aes(color = as.factor(`Trouble Sleeping`))) +
+  labs(title = "Total Nutrient Intake vs Combined Nutrients (Trouble Sleeping) Sampled",
+       x = "Total Nutrient Intake",
+       y = "Combined Nutrients (Vitamin A, C, Choline, Calcium, E)",
+       color = "Trouble Sleeping")
+
+
+```
+
+
+
+
+
+```{r}
+library(randomForest)
+library(caret)
+
+# Preparing data for 'Trouble Sleeping' prediction
+data_ts <- total_data_clean[, c('A', 'C', 'Choline', 'Calcium', 'E', 'Trouble Sleeping')]
+data_ts$`Trouble Sleeping` <- as.factor(data_ts$`Trouble Sleeping`)
+
+# Splitting the data into training and testing sets
+set.seed(123)  # for reproducibility
+train_index_ts <- sample(1:nrow(data_ts), 0.8 * nrow(data_ts))
+train_data_ts <- data_ts[train_index_ts, ]
+test_data_ts <- data_ts[-train_index_ts, ]
+
+# Training the Random Forest model
+rf_model_ts <- randomForest(`Trouble Sleeping` ~ ., data = train_data_ts, ntree = 500)
+
+# Making predictions on the test set
+predictions_ts <- predict(rf_model_ts, newdata = test_data_ts)
+
+# Evaluating the model
+confusion_matrix_ts <- table(Predicted = predictions_ts, Actual = test_data_ts$`Trouble Sleeping`)
+confusion_matrix_ts
+
+# Calculate accuracy for Trouble Sleeping model
+accuracy_ts <- sum(diag(confusion_matrix_ts)) / sum(confusion_matrix_ts)
+print(paste("Accuracy for Trouble Sleeping model:", accuracy_ts))
+
+
+
+
+```
+```{r}
+# Preparing data for 'Sleep Disorder' prediction
+data_sd <- total_data_clean[, c('A', 'C', 'Choline', 'Calcium', 'E', 'Sleep Disorder')]
+data_sd$`Sleep Disorder` <- as.factor(data_sd$`Sleep Disorder`)
+
+# Splitting the data
+set.seed(123)  # for reproducibility
+train_index_sd <- sample(1:nrow(data_sd), 0.8 * nrow(data_sd))
+train_data_sd <- data_sd[train_index_sd, ]
+test_data_sd <- data_sd[-train_index_sd, ]
+
+# Training the model
+rf_model_sd <- randomForest(`Sleep Disorder` ~ ., data = train_data_sd, ntree = 300)
+
+# Making predictions
+predictions_sd <- predict(rf_model_sd, newdata = test_data_sd)
+
+# Evaluating the model
+confusion_matrix_sd <- table(Predicted = predictions_sd, Actual = test_data_sd$`Sleep Disorder`)
+confusion_matrix_sd
+
+# Calculate accuracy for Sleep Disorder model
+accuracy_sd <- sum(diag(confusion_matrix_sd)) / sum(confusion_matrix_sd)
+print(paste("Accuracy for Sleep Disorder model:", accuracy_sd))
+
+
+```
+
+
